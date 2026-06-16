@@ -19,7 +19,7 @@
   "scripts": {
     "build": "npx --yes -p typescript@5.7.3 -p @types/node@20.17.57 tsc -p tsconfig.json --noEmit",
     "lint": "npm run build",
-    "test": "node --experimental-strip-types --test test/config-store.test.ts test/config-store-no-global.test.ts test/config-store-env-override.test.ts test/abortable-command.test.ts test/reminder-playback.test.ts test/permission-forwarding-watcher.test.ts test/sound-theme.test.ts test/webhook.test.ts test/linux.test.ts test/index.test.ts test/tts.test.ts",
+    "test": "node --experimental-strip-types --test test/config-store.test.ts test/config-store-no-global.test.ts test/config-store-env-override.test.ts test/abortable-command.test.ts test/reminder-playback.test.ts test/permission-forwarding-watcher.test.ts test/sound-theme.test.ts test/webhook.test.ts test/webhook-coverage.test.ts test/linux.test.ts test/index.test.ts test/tts.test.ts",
     "check": "npm run build && npm run test",
     "postinstall": "node -e \"const fs=require('fs'),cp=require('child_process'),p=require('path');const cwd=process.cwd();const normalized=cwd.split(p.sep).join('/');if(!normalized.includes('/.pi/agent/extensions/'))process.exit(0);const s=p.resolve(cwd,'../../scripts/patch-vulnerable-deps.mjs');if(!fs.existsSync(s))process.exit(0);const r=cp.spawnSync(process.execPath,[s,'--target',cwd,'--quiet'],{stdio:'inherit'});process.exit(r.status||0)\""
   },

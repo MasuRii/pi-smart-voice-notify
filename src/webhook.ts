@@ -221,9 +221,22 @@ function isPrivateOrReservedIPv6(address: string): boolean {
 		return true;
 	}
 
-	const mappedIPv4 = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)?.[1];
-	if (mappedIPv4) {
-		return isPrivateOrReservedIPv4(mappedIPv4);
+	// IPv4-mapped IPv6 in dotted-decimal form: ::ffff:127.0.0.1
+	const mappedIPv4Decimal = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)?.[1];
+	if (mappedIPv4Decimal) {
+		return isPrivateOrReservedIPv4(mappedIPv4Decimal);
+	}
+
+	// IPv4-mapped IPv6 in hex form: ::ffff:7f00:1 (Node.js URL parser normalizes to this)
+	const mappedIPv4Hex = normalized.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+	if (mappedIPv4Hex) {
+		const high = Number.parseInt(mappedIPv4Hex[1]!, 16);
+		const low = Number.parseInt(mappedIPv4Hex[2]!, 16);
+		const a = (high >> 8) & 0xff;
+		const b = high & 0xff;
+		const c = (low >> 8) & 0xff;
+		const d = low & 0xff;
+		return isPrivateOrReservedIPv4(`${a}.${b}.${c}.${d}`);
 	}
 
 	return (
