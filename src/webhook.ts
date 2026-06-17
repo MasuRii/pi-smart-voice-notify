@@ -228,7 +228,7 @@ function isPrivateOrReservedIPv6(address: string): boolean {
 	}
 
 	// IPv4-mapped IPv6 in hex form: ::ffff:7f00:1 (Node.js URL parser normalizes to this)
-	const mappedIPv4Hex = normalized.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+	const mappedIPv4Hex = normalized.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
 	if (mappedIPv4Hex) {
 		const high = Number.parseInt(mappedIPv4Hex[1]!, 16);
 		const low = Number.parseInt(mappedIPv4Hex[2]!, 16);

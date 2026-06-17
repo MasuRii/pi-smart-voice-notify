@@ -55,39 +55,29 @@ function baseConfig(overrides: Partial<WebhookConfig> = {}): WebhookConfig {
 // ---------------------------------------------------------------------------
 
 test("rate limiting enforces minimum interval between sends to the same target", async () => {
-	const intervals: number[] = [];
-	let firstSendTime = 0;
 	const { fetch: fetchFn, calls } = createControllableFetch();
-	const realSetTimeout = setTimeout;
 
+	const minInterval = 10;
 	const service = createWebhookService({
 		...baseConfig(),
-		minIntervalMs: 50,
+		minIntervalMs: minInterval,
 		fetch: fetchFn,
 	});
 
-	// Override Date.now to track timing
-	const realDateNow = Date.now;
-	let currentTime = 1_000;
-	Date.now = () => currentTime;
+	// First send
+	service.dispatch({ type: "idle", title: "A", message: "msg-a" });
+	await service.flush();
+	assert.equal(calls.length, 1);
 
-	try {
-		service.dispatch({ type: "idle", title: "A", message: "msg-a" });
-		await service.flush();
-		assert.equal(calls.length, 1);
-		firstSendTime = currentTime;
+	// Second send - measure real elapsed time to prove rate limiting waited
+	const start = performance.now();
+	service.dispatch({ type: "idle", title: "B", message: "msg-b" });
+	await service.flush();
+	const elapsed = performance.now() - start;
 
-		// Advance time slightly (not enough)
-		currentTime += 30;
-
-		service.dispatch({ type: "idle", title: "B", message: "msg-b" });
-		await service.flush();
-		// The second call should have waited
-		assert.equal(calls.length, 2);
-		intervals.push(currentTime);
-	} finally {
-		Date.now = realDateNow;
-	}
+	assert.equal(calls.length, 2);
+	// The second send should have waited at least minIntervalMs
+	assert.ok(elapsed >= minInterval, `elapsed ${elapsed}ms should be >= ${minInterval}ms`);
 });
 
 test("rate limiting tracks targets independently", async () => {
@@ -145,19 +135,8 @@ test("queue overflow drops oldest items when maxQueueSize is exceeded", async ()
 // ---------------------------------------------------------------------------
 
 test("retry attempts on server error with exponential backoff", async () => {
-	const { fetch: fetchFn, calls } = createControllableFetch();
+	const calls: Array<{ url: string; init: RequestInit }> = [];
 
-	const service = createWebhookService({
-		...baseConfig(),
-		maxRetries: 2,
-		baseRetryDelayMs: 1, // Keep delays minimal for testing
-		minIntervalMs: 0,
-		fetch: fetchFn,
-	});
-
-	const { setNextResponse } = createControllableFetch();
-
-	// Simulate 500 then 200
 	let attempt = 0;
 	const customFetch = async (url: string, init: RequestInit): Promise<Response> => {
 		calls.push({ url, init });
@@ -254,15 +233,15 @@ test("no retry when maxRetries is 0", async () => {
 // ---------------------------------------------------------------------------
 
 test("parseRetryAfter handles numeric seconds value", async () => {
-	let attempted = false;
+	let callCount = 0;
 	const service = createWebhookService({
 		...baseConfig(),
 		maxRetries: 1,
 		baseRetryDelayMs: 1,
 		minIntervalMs: 0,
 		fetch: async () => {
-			if (!attempted) {
-				attempted = true;
+			callCount++;
+			if (callCount === 1) {
 				return new Response(null, {
 					status: 429,
 					headers: { "Retry-After": "0.001" },
@@ -275,8 +254,8 @@ test("parseRetryAfter handles numeric seconds value", async () => {
 	service.dispatch({ type: "idle", title: "Parse RA", message: "test" });
 	await service.flush();
 
-	// If Retry-After was parsed correctly, the retry should have happened
-	assert.equal(attempted, true);
+	// First call gets 429, second call gets 200
+	assert.equal(callCount, 2);
 });
 
 // ---------------------------------------------------------------------------
@@ -810,8 +789,8 @@ test("generic webhook includes Content-Type application/json header", async () =
 	service.dispatch({ type: "idle", title: "T", message: "M" });
 	await service.flush();
 
-	const headers = calls[0]!.init.headers as Record<string, string>;
-	assert.equal(headers["Content-Type"], "application/json");
+	const headers = new Headers(calls[0]!.init.headers);
+	assert.equal(headers.get("content-type"), "application/json");
 });
 
 test("custom headers are merged with defaults", async () => {
@@ -828,9 +807,9 @@ test("custom headers are merged with defaults", async () => {
 	service.dispatch({ type: "idle", title: "T", message: "M" });
 	await service.flush();
 
-	const headers = calls[0]!.init.headers as Record<string, string>;
-	assert.equal(headers["Content-Type"], "application/json");
-	assert.equal(headers["X-Custom-Header"], "custom-value");
+	const headers = new Headers(calls[0]!.init.headers);
+	assert.equal(headers.get("content-type"), "application/json");
+	assert.equal(headers.get("x-custom-header"), "custom-value");
 });
 
 // ---------------------------------------------------------------------------
@@ -873,27 +852,6 @@ test("discord provider with non-discord URL is rejected during target resolution
 	});
 
 	assert.equal(service.isEnabled(), false);
-});
-
-// ---------------------------------------------------------------------------
-// Environment variable parsing
-// ---------------------------------------------------------------------------
-
-test("environment variables enable webhook and set URLs", () => {
-	const env = {
-		PI_SMART_NOTIFY_WEBHOOK_ENABLED: "true",
-		PI_SMART_NOTIFY_WEBHOOK_URL: "https://example.com/env-webhook",
-	} as NodeJS.ProcessEnv;
-
-	// The service should pick up env config through the resolveConfig path
-	// We can't directly test env parsing without process.env manipulation,
-	// but we can verify the service respects env through construction
-	const service = createWebhookService({
-		enabled: true,
-		genericWebhookUrl: "https://example.com/env-webhook",
-	});
-
-	assert.equal(service.isEnabled(), true);
 });
 
 // ---------------------------------------------------------------------------
@@ -962,6 +920,5 @@ test("retry loop exits immediately when signal is already aborted", async () => 
 	await service.flush(controller.signal);
 
 	// The aborted flush should not process all retries
-	// at minimum, it should not hang
-	assert.ok(attempts >= 0);
+	assert.ok(attempts <= 1, `attempts should be <= 1, got ${attempts}`);
 });
