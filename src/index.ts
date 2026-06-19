@@ -1814,7 +1814,7 @@ export default function smartVoiceNotifyExtension(
 		}
 
 		if (subcommand === "reload") {
-			config = readConfig();
+			config = readConfig(ctx.cwd);
 			refreshIntegratedServiceConfig();
 			await syncPermissionForwardingWatcher();
 			refreshQuestionToolAvailability();
@@ -1880,7 +1880,7 @@ export default function smartVoiceNotifyExtension(
 		shutdownRequested = false;
 		shutdownPromise = null;
 		cancelPendingAgentErrorNotification("session_start");
-		config = readConfig();
+		config = readConfig(ctx.cwd);
 		refreshIntegratedServiceConfig();
 		activeSessionContext = ctx;
 		await syncPermissionForwardingWatcher();

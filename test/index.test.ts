@@ -10,6 +10,7 @@ import type { VoiceNotifyConfig } from "../src/types.ts";
 
 interface FakeContext {
 	hasUI: boolean;
+	cwd?: string;
 	hasPendingMessages?: () => boolean;
 }
 
@@ -979,4 +980,26 @@ test("forwarded permission resolution aborts active reminder playback for that r
 	await flushAsyncWork();
 
 	assert.equal(activeReminderCalls[0]?.aborted, true);
+});
+
+test("session_start reads project config using ctx.cwd", async () => {
+	const seenProjectRoots: Array<string | undefined> = [];
+	const pi = new FakePi();
+	const { service } = createControlledTTSService();
+
+	smartVoiceNotifyExtension(pi as unknown as ExtensionAPI, {
+		readConfigFromDisk: (projectRoot?: string) => {
+			seenProjectRoots.push(projectRoot);
+			return createTestConfig({});
+		},
+		initializeTTSService: () => service,
+		createPermissionForwardingWatcher: (options) => new FakePermissionForwardingWatcher(options),
+	});
+
+	await pi.emit("session_start", { reason: "startup" }, { hasUI: false, cwd: "/repo" });
+
+	assert.ok(
+		seenProjectRoots.includes("/repo"),
+		`expected readConfig to be called with ctx.cwd; saw ${JSON.stringify(seenProjectRoots)}`,
+	);
 });

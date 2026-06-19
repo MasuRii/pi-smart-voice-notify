@@ -19,7 +19,7 @@
   "scripts": {
     "build": "npx --yes -p typescript@5.7.3 -p @types/node@20.17.57 tsc -p tsconfig.json --noEmit",
     "lint": "npm run build",
-    "test": "node --experimental-strip-types --test test/abortable-command.test.ts test/reminder-playback.test.ts test/permission-forwarding-watcher.test.ts test/sound-theme.test.ts test/webhook.test.ts test/linux.test.ts test/index.test.ts test/tts.test.ts",
+    "test": "node --experimental-strip-types --test test/config-store.test.ts test/config-store-no-global.test.ts test/abortable-command.test.ts test/reminder-playback.test.ts test/permission-forwarding-watcher.test.ts test/sound-theme.test.ts test/webhook.test.ts test/linux.test.ts test/index.test.ts test/tts.test.ts",
     "check": "npm run build && npm run test"
   },
   "keywords": [

@@ -99,6 +99,7 @@ Configuration is stored at:
 ```text
 Default global path: ~/.pi/agent/extensions/pi-smart-voice-notify/config.json
 Actual global path: $PI_CODING_AGENT_DIR/extensions/pi-smart-voice-notify/config.json when PI_CODING_AGENT_DIR is set
+Local config path: <repo>/.pi/extensions/pi-smart-voice-notify/config.json
 ```
 
 A starter template is provided in `config/config.example.json`. On startup, the extension creates `config.json` with defaults if missing.

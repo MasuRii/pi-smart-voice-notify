@@ -16,6 +16,11 @@ export const EXTENSION_ID = "pi-smart-voice-notify";
 export const STATUS_KEY = "smart-voice-notify";
 export const CONFIG_DIR = join(resolvePiAgentDir(), "extensions", EXTENSION_ID);
 export const CONFIG_PATH = join(CONFIG_DIR, "config.json");
+
+/** Project-local override config: <projectRoot>/.pi/extensions/<id>/config.json (read-only). */
+export function resolveProjectConfigPath(projectRoot: string): string {
+	return join(projectRoot, ".pi", "extensions", EXTENSION_ID, "config.json");
+}
 export const DEBUG_DIR = join(CONFIG_DIR, "debug");
 export const DEBUG_LOG_PATH = join(DEBUG_DIR, `${EXTENSION_ID}.log`);
 
@@ -979,28 +984,74 @@ export function ensureDebugDirectory(): void {
 	}
 }
 
-export function readConfigFromDisk(): VoiceNotifyConfig {
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Deep-merge `override` onto `base`. Nested objects merge; arrays and scalars replace. */
+export function deepMergeConfigRecords(
+	base: Record<string, unknown>,
+	override: Record<string, unknown>,
+): Record<string, unknown> {
+	const result: Record<string, unknown> = { ...base };
+	for (const [key, value] of Object.entries(override)) {
+		const existing = result[key];
+		result[key] = isPlainObject(existing) && isPlainObject(value)
+			? deepMergeConfigRecords(existing, value)
+			: value;
+	}
+	return result;
+}
+
+function readConfigRecord(path: string): Record<string, unknown> | null {
+	if (!existsSync(path)) {
+		return null;
+	}
+	try {
+		return toRecord(JSON.parse(readFileSync(path, "utf-8")) as unknown);
+	} catch {
+		return null;
+	}
+}
+
+/** Load and self-heal the global config file, returning its raw record. */
+function loadGlobalConfigRecord(): Record<string, unknown> {
 	ensureConfigDirectory();
+	const defaultsSerialized = `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`;
 	if (!existsSync(CONFIG_PATH)) {
-		writeFileSync(CONFIG_PATH, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`, "utf-8");
-		return applyEnvironmentOverrides({ ...DEFAULT_CONFIG, webhook: { ...DEFAULT_CONFIG.webhook, events: [...DEFAULT_CONFIG.webhook.events] } });
+		writeFileSync(CONFIG_PATH, defaultsSerialized, "utf-8");
+		return toRecord(JSON.parse(defaultsSerialized));
 	}
 
 	try {
 		const raw = readFileSync(CONFIG_PATH, "utf-8");
 		const parsed = JSON.parse(raw) as unknown;
-		const normalized = normalizeConfig(parsed);
-		const validation = validateConfig(normalized);
-		const serialized = `${JSON.stringify(validation.config, null, 2)}\n`;
+		const serialized = `${JSON.stringify(validateConfig(normalizeConfig(parsed)).config, null, 2)}\n`;
 		if (raw !== serialized) {
 			writeFileSync(CONFIG_PATH, serialized, "utf-8");
 		}
-		const runtimeConfig = applyEnvironmentOverrides(validation.config);
-		return validateConfig(runtimeConfig).config;
+		return toRecord(parsed);
 	} catch {
-		writeFileSync(CONFIG_PATH, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`, "utf-8");
-		return applyEnvironmentOverrides({ ...DEFAULT_CONFIG, webhook: { ...DEFAULT_CONFIG.webhook, events: [...DEFAULT_CONFIG.webhook.events] } });
+		writeFileSync(CONFIG_PATH, defaultsSerialized, "utf-8");
+		return toRecord(JSON.parse(defaultsSerialized));
 	}
+}
+
+/**
+ * Read the effective config. When `projectRoot` is given and a project config
+ * exists, it deep-merges over the global config; environment variables still
+ * override both. The project file is read-only — only the global file is healed.
+ */
+export function readConfigFromDisk(projectRoot?: string): VoiceNotifyConfig {
+	let record = loadGlobalConfigRecord();
+	if (projectRoot) {
+		const projectRecord = readConfigRecord(resolveProjectConfigPath(projectRoot));
+		if (projectRecord) {
+			record = deepMergeConfigRecords(record, projectRecord);
+		}
+	}
+	const runtimeConfig = applyEnvironmentOverrides(validateConfig(normalizeConfig(record)).config);
+	return validateConfig(runtimeConfig).config;
 }
 
 export function writeConfigToDisk(config: VoiceNotifyConfig): void {
