@@ -12,6 +12,7 @@
   "enableTts": true,
   "enableDesktopNotification": true,
   "desktopNotificationTimeout": 8,
+  "showStatusBar": true,
   "wakeMonitor": true,
   "idleThresholdSeconds": 30,
   "enableIdleNotification": true,

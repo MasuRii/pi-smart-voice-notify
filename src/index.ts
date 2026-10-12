@@ -190,7 +190,10 @@ function hasPendingAgentMessages(ctx: ExtensionContext): boolean {
 	}
 }
 
-function statusLine(config: VoiceNotifyConfig): string | undefined {
+export function statusLine(config: VoiceNotifyConfig): string | undefined {
+	if (!config.showStatusBar) {
+		return undefined;
+	}
 	if (!config.enabled) {
 		return "voice:off";
 	}
@@ -1635,6 +1638,9 @@ export default function smartVoiceNotifyExtension(
 			case "enableDesktopNotification":
 				draft.enableDesktopNotification = boolValue(value);
 				return;
+			case "showStatusBar":
+				draft.showStatusBar = boolValue(value);
+				return;
 			case "skipWhenFocused":
 				draft.skipWhenFocused = boolValue(value);
 				return;
@@ -1659,6 +1665,12 @@ export default function smartVoiceNotifyExtension(
 				id: "enableDesktopNotification",
 				label: "Desktop Notifications",
 				currentValue: draft.enableDesktopNotification ? "on" : "off",
+				values: [...BOOLEAN_VALUES],
+			},
+			{
+				id: "showStatusBar",
+				label: "Show Status Bar Indicator",
+				currentValue: draft.showStatusBar ? "on" : "off",
 				values: [...BOOLEAN_VALUES],
 			},
 			{

@@ -80,6 +80,7 @@ export interface VoiceNotifyConfig extends EngineTtsSettings, FlatAIMessageConfi
 	ttsEngine: TTSEngine;
 	enableDesktopNotification: boolean;
 	desktopNotificationTimeout: number;
+	showStatusBar: boolean;
 	wakeMonitor: boolean;
 	idleThresholdSeconds: number;
 	enableIdleNotification: boolean;

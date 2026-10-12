@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test, { mock, type TestContext } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { DEFAULT_CONFIG } from "../src/config-store.ts";
-import smartVoiceNotifyExtension, { type SmartVoiceNotifyDependencies } from "../src/index.ts";
+import { DEFAULT_CONFIG, STATUS_KEY } from "../src/config-store.ts";
+import smartVoiceNotifyExtension, {
+	statusLine,
+	type SmartVoiceNotifyDependencies,
+} from "../src/index.ts";
 import type { TTSAvailability, TTSConfig, TTSEngine, TTSService, SpeakOptions } from "../src/types/tts.ts";
 import {
 	PERMISSION_SYSTEM_EVENT_CHANNEL,
@@ -34,6 +39,10 @@ interface FakeContext {
 	hasUI: boolean;
 	cwd?: string;
 	hasPendingMessages?: () => boolean;
+	ui?: {
+		setStatus: (key: string, text: string | undefined) => void;
+		notify: (message: string, level?: string) => void;
+	};
 }
 
 interface SpeakCall {
@@ -888,4 +897,81 @@ test("session_start reads project config using ctx.cwd", async () => {
 		seenProjectRoots.includes("/repo"),
 		`expected readConfig to be called with ctx.cwd; saw ${JSON.stringify(seenProjectRoots)}`,
 	);
+});
+
+/**
+ * Build a UI-capable context that records `ctx.ui.setStatus` calls so the
+ * status bar indicator wiring can be asserted. The shared harness returns a
+ * headless ctx (hasUI: false), which would make updateStatus a no-op.
+ */
+function createStatusRecordingContext(): { ctx: FakeContext; statusCalls: Array<[string, string | undefined]> } {
+	const statusCalls: Array<[string, string | undefined]> = [];
+	const ctx: FakeContext = {
+		hasUI: true,
+		ui: {
+			setStatus: (key: string, text: string | undefined): void => {
+				statusCalls.push([key, text]);
+			},
+			notify: (): void => {
+			},
+		},
+	};
+	return { ctx, statusCalls };
+}
+
+test("session_start renders the voice status indicator when showStatusBar is enabled", async () => {
+	const { pi } = createHarness({ showStatusBar: true });
+	const { ctx, statusCalls } = createStatusRecordingContext();
+
+	await emitSessionStart(pi, ctx);
+
+	assert.equal(statusCalls.length, 1);
+	assert.equal(statusCalls[0]?.[0], STATUS_KEY);
+	assert.match(statusCalls[0]?.[1] ?? "", /^voice:/);
+});
+
+test("session_start clears the status indicator when showStatusBar is disabled", async () => {
+	const { pi } = createHarness({ showStatusBar: false });
+	const { ctx, statusCalls } = createStatusRecordingContext();
+
+	await emitSessionStart(pi, ctx);
+
+	assert.equal(statusCalls.length, 1);
+	assert.equal(statusCalls[0]?.[0], STATUS_KEY);
+	assert.equal(statusCalls[0]?.[1], undefined);
+});
+
+test("statusLine hides the indicator whenever showStatusBar is off", () => {
+	assert.equal(statusLine(createTestConfig({ showStatusBar: false })), undefined);
+	// Hiding must win over the disabled state too, otherwise a disabled extension
+	// would keep rendering "voice:off" against the user's wish.
+	assert.equal(statusLine(createTestConfig({ showStatusBar: false, enabled: false })), undefined);
+});
+
+test("statusLine reports voice:off when the extension is disabled but showStatusBar is on", () => {
+	assert.equal(statusLine(createTestConfig({ showStatusBar: true, enabled: false })), "voice:off");
+});
+
+test("statusLine summarizes the active channels when enabled", () => {
+	assert.equal(
+		statusLine(
+			createTestConfig({
+				showStatusBar: true,
+				enabled: true,
+				notificationMode: "sound-first",
+				enableSound: true,
+				enableTts: false,
+				enableDesktopNotification: false,
+			}),
+		),
+		"voice:sound-first snd no-tts no-toast",
+	);
+});
+
+test("settings modal exposes the showStatusBar toggle and applies it", () => {
+	const source = readFileSync(fileURLToPath(new URL("../src/index.ts", import.meta.url)), "utf-8");
+	// Contract guard: the modal item id, the applySetting case, and the toggle
+	// must stay wired together or the setting becomes unreachable from the UI.
+	assert.match(source, /id: "showStatusBar"/);
+	assert.match(source, /case "showStatusBar":\s*\n\s*draft\.showStatusBar = boolValue\(value\)/);
 });
