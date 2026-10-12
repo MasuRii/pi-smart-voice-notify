@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- Added a `showStatusBar` config option (also exposed as **Show Status Bar Indicator** in the `/voice-notify` settings modal) to hide the `voice:...` status bar indicator. Defaults to `true`, preserving existing behavior.
+
 ## [0.6.0] - 2026-07-03
 
 ### Added

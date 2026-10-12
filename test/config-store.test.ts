@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+	DEFAULT_CONFIG,
 	deepMergeConfigRecords,
 	normalizeConfig,
 	resolveProjectConfigPath,
@@ -48,4 +49,17 @@ test("a partial project record overrides only its keys through normalizeConfig",
 	const config = normalizeConfig(deepMergeConfigRecords(globalRecord, projectRecord));
 	assert.equal(config.windowsOptimized, false);
 	assert.equal(config.notificationMode, "tts-first");
+});
+
+test("showStatusBar defaults to true so the status indicator is unchanged for existing configs", () => {
+	assert.equal(normalizeConfig({}).showStatusBar, true);
+	assert.equal(DEFAULT_CONFIG.showStatusBar, true);
+});
+
+test("showStatusBar accepts an explicit boolean and falls back on invalid values", () => {
+	assert.equal(normalizeConfig({ showStatusBar: false }).showStatusBar, false);
+	assert.equal(normalizeConfig({ showStatusBar: true }).showStatusBar, true);
+	// Non-boolean junk must not disable the indicator; it falls back to the default.
+	assert.equal(normalizeConfig({ showStatusBar: "maybe" }).showStatusBar, true);
+	assert.equal(normalizeConfig({ showStatusBar: null }).showStatusBar, true);
 });

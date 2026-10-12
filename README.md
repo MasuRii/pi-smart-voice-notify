@@ -50,6 +50,7 @@ Windows-optimized smart notification extension for the Pi coding agent.
 - **Interactive settings UI**
   - `/voice-notify` command opens a modal for live configuration
   - Settings persist to disk automatically
+  - Optional `voice:...` status bar indicator (`showStatusBar`)
 
 - **Debug logging**
   - Optional JSONL debug output for troubleshooting
@@ -121,6 +122,7 @@ A starter template is provided in `config/config.example.json`. On startup, the 
 | `ttsEngine` | string | `"auto"` | Engine: `auto`, `edge`, `espeak-ng`, `elevenlabs`, `openai`, `sapi` |
 | `enableDesktopNotification` | boolean | `true` | Enable desktop toast notifications |
 | `desktopNotificationTimeout` | number | `8` | Toast display duration in seconds (1–60) |
+| `showStatusBar` | boolean | `true` | Show the `voice:...` indicator in the Pi status bar |
 | `wakeMonitor` | boolean | `true` | Wake display from sleep before notifying |
 | `idleThresholdSeconds` | number | `30` | System idle threshold before waking monitor (5–600) |
 | `skipWhenFocused` | boolean | `false` | Suppress notifications while the active Linux terminal/editor is focused |
